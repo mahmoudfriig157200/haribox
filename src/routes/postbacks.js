@@ -6,7 +6,7 @@ const router = express.Router();
 
 // OGAds Postback based on provided placeholders
 // Example: https://website.com/postback.php?id={offer_id}&payout={payout}&ip={session_ip}&aff_sub={aff_sub}&aff_sub4={aff_sub4}&aff_sub5={aff_sub5}
-router.get('/ogads', async (req, res) => {
+router.get('/network', async (req, res) => {
   try {
     // Simple shared-secret check (set OGADS_POSTBACK_SECRET in .env and OGAds dashboard)
     const expected = (process.env.OGADS_POSTBACK_SECRET || '').toString();

@@ -20,7 +20,25 @@ const app = express();
 // Security & utils
 // app.set('trust proxy', 1); // Uncomment in production if behind a single proxy (e.g., Nginx/Heroku)
 app.use(helmet());
-app.use(cors({ origin: process.env.CORS_ORIGIN?.split(',') || true, credentials: true }));
+
+// Robust CORS: parse env, trim, allow localhost by default, handle preflight
+const rawOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000').split(',');
+const allowList = rawOrigins.map(o => o.trim()).filter(Boolean);
+const corsOptions = {
+  origin(origin, callback) {
+    // Allow mobile apps/tools with no origin
+    if (!origin) return callback(null, true);
+    if (allowList.includes(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'), false);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  optionsSuccessStatus: 204,
+};
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+
 app.use(express.json());
 app.use(morgan('dev'));
 app.use(rateLimit({ windowMs: 60 * 1000, max: 200 }));
@@ -39,7 +57,9 @@ app.use('/admin', adminRoutes);
 app.use('/postbacks', postbacksRoutes);
 app.use('/referrals', referralsRoutes);
 app.use('/withdrawals', withdrawalsRoutes);
+// Backward compat + ad-block friendly path
 app.use('/offers', offersRoutes);
+app.use('/api/catalog', offersRoutes);
 app.use('/rewards', rewardsRoutes);
 
 // Error fallback

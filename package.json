@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch src/server.js",
-    "start": "NODE_ENV=production node src/server.js",
+    "start": "node src/server.js",
     "lint": "echo 'add eslint later'"
   },
   "dependencies": {

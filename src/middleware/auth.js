@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import { User } from '../models/User.js';
 
 export function requireAuth(req, res, next) {
   const header = req.headers.authorization || '';
@@ -16,9 +17,14 @@ export function requireAuth(req, res, next) {
   }
 }
 
-export function requireAdmin(req, res, next) {
-  if (!req.user || req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Forbidden' });
+export async function requireAdmin(req, res, next) {
+  try {
+    if (!req.user || !req.user.id) return res.status(403).json({ error: 'Forbidden' });
+    // Always check the current role from DB to avoid stale JWT role
+    const u = await User.findById(req.user.id).select('role').lean();
+    if (!u || u.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+    return next();
+  } catch (e) {
+    return res.status(500).json({ error: 'Server error' });
   }
-  next();
 }

@@ -22,31 +22,53 @@ const app = express();
 app.use(helmet());
 
 // Robust CORS: parse env, trim, allow localhost by default, handle preflight
-const rawOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000').split(',');
+const rawOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000, https://*.vercel.app').split(',');
 const allowList = rawOrigins.map(o => o.trim()).filter(Boolean);
 
 function isAllowedOrigin(origin) {
   try {
+    // Allow everything when explicitly enabled (use only for debugging!)
+    if (process.env.CORS_ALLOW_ALL === '1') return true;
+
     // No origin (mobile apps, curl) → allow
     if (!origin) return true;
+
     // Exact match fast path
     if (allowList.includes(origin)) return true;
+
     const { hostname } = new URL(origin);
-    for (const item of allowList) {
+    for (const itemRaw of allowList) {
+      const item = (itemRaw || '').trim();
       if (!item) continue;
       if (item === '*') return true;
-      // Wildcard subdomains: "*.example.com"
+
+      // Wildcard subdomains without scheme: "*.example.com"
       if (item.startsWith('*.')) {
         const suffix = item.slice(1); // ".example.com"
         if (hostname.endsWith(suffix)) return true;
         continue;
       }
-      // Host-only: "example.com" or ".example.com"
+
+      // Wildcard with scheme: "https://*.example.com" or "http://*.example.com"
+      if ((item.startsWith('http://') || item.startsWith('https://')) && item.includes('*.')) {
+        // Strip scheme and path, then treat as wildcard host
+        const noScheme = item.replace(/^https?:\/\//, '');
+        const hostOnly = noScheme.split('/')[0];
+        if (hostOnly.startsWith('*.')) {
+          const suffix = hostOnly.slice(1); // ".example.com"
+          if (hostname.endsWith(suffix)) return true;
+          continue;
+        }
+      }
+
+      // Host-only: allow specifying just the domain (with or without leading dot)
       if (!item.startsWith('http')) {
+        // Accept exact host or any subdomain if a leading dot or bare domain is provided
         const norm = item.startsWith('.') ? item : `.${item}`;
         if ((`.` + hostname).endsWith(norm)) return true;
         continue;
       }
+
       // Full origin with scheme, compare by origin
       try {
         const u = new URL(item);
@@ -62,6 +84,9 @@ function isAllowedOrigin(origin) {
 const corsOptions = {
   origin(origin, callback) {
     if (isAllowedOrigin(origin)) return callback(null, true);
+    if (process.env.CORS_DEBUG === '1') {
+      console.warn('[CORS] Blocked origin:', origin, 'AllowList:', allowList);
+    }
     return callback(new Error('Not allowed by CORS'), false);
   },
   credentials: true,

@@ -24,44 +24,11 @@ app.use(helmet());
 // Robust CORS: parse env, trim, allow localhost by default, handle preflight
 const rawOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000').split(',');
 const allowList = rawOrigins.map(o => o.trim()).filter(Boolean);
-
-function isAllowedOrigin(origin) {
-  try {
-    // No origin (mobile apps, curl) → allow
-    if (!origin) return true;
-    // Exact match fast path
-    if (allowList.includes(origin)) return true;
-    const { hostname } = new URL(origin);
-    for (const item of allowList) {
-      if (!item) continue;
-      if (item === '*') return true;
-      // Wildcard subdomains: "*.example.com"
-      if (item.startsWith('*.')) {
-        const suffix = item.slice(1); // ".example.com"
-        if (hostname.endsWith(suffix)) return true;
-        continue;
-      }
-      // Host-only: "example.com" or ".example.com"
-      if (!item.startsWith('http')) {
-        const norm = item.startsWith('.') ? item : `.${item}`;
-        if ((`.` + hostname).endsWith(norm)) return true;
-        continue;
-      }
-      // Full origin with scheme, compare by origin
-      try {
-        const u = new URL(item);
-        if (u.origin === origin) return true;
-      } catch (_) {
-        // ignore parse errors
-      }
-    }
-  } catch (_) {}
-  return false;
-}
-
 const corsOptions = {
   origin(origin, callback) {
-    if (isAllowedOrigin(origin)) return callback(null, true);
+    // Allow mobile apps/tools with no origin
+    if (!origin) return callback(null, true);
+    if (allowList.includes(origin)) return callback(null, true);
     return callback(new Error('Not allowed by CORS'), false);
   },
   credentials: true,
